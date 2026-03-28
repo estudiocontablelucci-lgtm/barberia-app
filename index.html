@@ -500,6 +500,7 @@ select:focus, input:focus { border-color:var(--gold-dim); }
         <div class="select-wrap">
           <select id="commPeriodSelect" class="filter-select" style="min-width:0;width:100%">
             <option value="1">Hoy</option>
+            <option value="2">Ayer</option>
             <option value="7" selected>Últimos 7 días</option>
             <option value="30">Últimos 30 días</option>
             <option value="all">Todo el historial</option>
@@ -665,14 +666,17 @@ function saveExp(d)    { localStorage.setItem(EXPENSE_KEY,JSON.stringify(d)); }
 
 function todayCuts()   { const t=today(); return loadCuts().filter(c=>c.date===t); }
 function today()       { return new Date().toLocaleDateString('es-AR'); }
+function yesterday()   { const d=new Date(); d.setDate(d.getDate()-1); return d.toLocaleDateString('es-AR'); }
 
 function filteredCuts(days) {
   if (days==='all') return loadCuts();
+  if (days==='2') return loadCuts().filter(x=>x.date===yesterday()); // "Ayer" exacto
   const c=new Date(Date.now()-days*864e5);
   return loadCuts().filter(x=>new Date(x.ts)>=c);
 }
 function filteredExp(days) {
   if (days==='all') return loadExp();
+  if (days==='2') return loadExp().filter(x=>x.date===yesterday());
   const c=new Date(Date.now()-days*864e5);
   return loadExp().filter(x=>new Date(x.ts)>=c);
 }
@@ -998,7 +1002,9 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
     document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+    const view = document.getElementById('tab-'+btn.dataset.tab);
+    view.classList.add('active');
+    view.scrollTop = 0;
     if(btn.dataset.tab==='historial') renderFullLog();
     if(btn.dataset.tab==='gastos')    renderExpenses();
     if(btn.dataset.tab==='owner'&&unlocked) refreshOwner();
