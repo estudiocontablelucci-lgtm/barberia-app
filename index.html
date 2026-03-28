@@ -627,10 +627,10 @@ const CONFIG = {
 
   barbers: [
     // commission = % que le corresponde AL BARBERO (ej: 0.5 = 50%)
-    { id:'b1', name:'Martín',  initials:'MA', commission:0.50 },
-    { id:'b2', name:'Rodrigo', initials:'RO', commission:0.55 },
-    { id:'b3', name:'Facundo', initials:'FA', commission:0.50 },
-    { id:'b4', name:'Nicolás', initials:'NI', commission:0.60 },
+    { id:'b1', name:'Jeremías', initials:'JE', commission:0.50 },
+    { id:'b2', name:'Gonzalo',  initials:'GO', commission:0.55 },
+    { id:'b3', name:'Tomás',    initials:'TO', commission:0.50 },
+    { id:'b4', name:'Nicolás',  initials:'NI', commission:0.60 },
   ],
 
   services: [
@@ -697,7 +697,9 @@ function renderBarberGrid() {
     const tips  = tday.filter(c=>c.barberId===b.id&&c.type==='tip');
     const total = cuts.reduce((s,c)=>s+Number(c.price),0);
     const tipT  = tips.reduce((s,c)=>s+Number(c.amount||c.price),0);
-    const tipLine = tipT>0 ? `<span class="stat-tip">💰 ${fmt$(tipT)} propinas</span>` : '';
+    const tipLine = tipT > 0
+      ? `<span class="stat-tip">💰 ${fmt$(tipT)} propinas</span>`
+      : `<span class="stat-tip" style="opacity:0;pointer-events:none">💰 —</span>`;
     return `<div class="barber-card${selBarber===b.id?' selected':''}" onclick="selectBarber('${b.id}')">
       <div class="barber-avatar">${b.initials}</div>
       <div class="barber-name">${b.name}</div>
