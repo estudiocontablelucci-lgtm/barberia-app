@@ -1007,7 +1007,10 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
     view.scrollTop = 0;
     if(btn.dataset.tab==='historial') renderFullLog();
     if(btn.dataset.tab==='gastos')    renderExpenses();
-    if(btn.dataset.tab==='owner'&&unlocked) refreshOwner();
+    if(btn.dataset.tab==='owner') {
+      if(unlocked) refreshOwner();
+      else setTimeout(()=>{ document.getElementById('lockScreen').scrollIntoView({behavior:'smooth', block:'center'}); }, 50);
+    }
   });
 });
 document.querySelectorAll('.osub-btn').forEach(btn=>{
