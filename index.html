@@ -1112,10 +1112,13 @@ function doLogout(){
 });
 
 function refreshOwner(){
-  renderCommissions();
-  if(document.getElementById('osub-graficos').classList.contains('active')) renderCharts();
-  if(document.getElementById('osub-ranking').classList.contains('active'))  renderRanking();
-  if(document.getElementById('osub-pnl').classList.contains('active'))      renderPnL();
+  // pequeño delay para asegurar que el modal ya cerró antes de re-renderizar
+  setTimeout(()=>{
+    renderCommissions();
+    renderRanking();
+    renderPnL();
+    if(document.getElementById('osub-graficos').classList.contains('active')) renderCharts();
+  }, 50);
 }
 
 // ══════════════════════════════════════════════════
