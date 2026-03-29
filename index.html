@@ -578,7 +578,25 @@ select:focus, input:focus { border-color:var(--gold-dim); }
 
 <div id="toast"></div>
 
-<!-- ════ MODAL: EDITAR CORTE ════ -->
+<!-- ════ MODAL: EDITAR COMISIÓN ════ -->
+<div class="modal-overlay" id="commModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">COMISIÓN</div>
+    <div id="commModalBarberName" style="font-family:'Playfair Display',serif;font-size:15px;color:var(--gold-dim);margin-top:-8px;"></div>
+    <div>
+      <label>Porcentaje del barbero (%)</label>
+      <input type="number" id="commInput" min="1" max="99" step="1" placeholder="50">
+      <div style="font-size:11px;color:var(--white-dim);margin-top:6px;letter-spacing:.5px;">
+        Ingresá el porcentaje que le corresponde al barbero. Ej: <b style="color:var(--white)">50</b> = 50% para él, 50% para el local.
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="saveCommission()" style="font-size:18px;letter-spacing:3px;padding:14px">GUARDAR</button>
+      <button class="btn-outline" onclick="closeModal('commModal')">Cancelar</button>
+    </div>
+  </div>
+</div>
 <div class="modal-overlay" id="editModal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
@@ -651,6 +669,7 @@ let unlocked    = false;
 let editingId   = null;
 let editPay     = null;
 let tipPay      = null;
+let editingBarberId = null;
 let charts      = {};
 
 // ══════════════════════════════════════════════════
@@ -658,11 +677,20 @@ let charts      = {};
 // ══════════════════════════════════════════════════
 const CUTS_KEY   = 'bos_cuts';
 const EXPENSE_KEY= 'bos_expenses';
+const COMM_KEY   = 'bos_commissions';
 
 function loadCuts()    { try{return JSON.parse(localStorage.getItem(CUTS_KEY))||[];}catch{return[];} }
 function saveCuts(d)   { localStorage.setItem(CUTS_KEY,JSON.stringify(d)); }
 function loadExp()     { try{return JSON.parse(localStorage.getItem(EXPENSE_KEY))||[];}catch{return[];} }
 function saveExp(d)    { localStorage.setItem(EXPENSE_KEY,JSON.stringify(d)); }
+function loadComms()   { try{return JSON.parse(localStorage.getItem(COMM_KEY))||{};}catch{return {};} }
+function saveComms(d)  { localStorage.setItem(COMM_KEY,JSON.stringify(d)); }
+
+// Get effective commission — stored override takes priority over CONFIG default
+function getCommission(barberId) {
+  const stored = loadComms();
+  return stored[barberId] !== undefined ? stored[barberId] : CONFIG.barbers.find(b=>b.id===barberId)?.commission || 0.5;
+}
 
 function todayCuts()   { const t=today(); return loadCuts().filter(c=>c.date===t); }
 function today()       { return new Date().toLocaleDateString('es-AR'); }
@@ -982,8 +1010,29 @@ function deleteEntry() {
 //  MODALS
 // ══════════════════════════════════════════════════
 function openModal(id)  { document.getElementById(id).classList.add('open'); }
-function closeModal(id) { document.getElementById(id).classList.remove('open'); if(id==='editModal'){editingId=null;editPay=null;} if(id==='tipModal'){tipPay=null;} }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); if(id==='editModal'){editingId=null;editPay=null;} if(id==='tipModal'){tipPay=null;} if(id==='commModal'){editingBarberId=null;} }
 document.querySelectorAll('.modal-overlay').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)closeModal(this.id);}));
+
+// ══════════════════════════════════════════════════
+//  COMMISSION EDIT
+// ══════════════════════════════════════════════════
+function openCommModal(barberId) {
+  editingBarberId = barberId;
+  const b = barberById(barberId);
+  document.getElementById('commModalBarberName').textContent = b.name;
+  document.getElementById('commInput').value = Math.round(getCommission(barberId) * 100);
+  openModal('commModal');
+}
+function saveCommission() {
+  const val = parseInt(document.getElementById('commInput').value);
+  if (isNaN(val) || val < 1 || val > 99) { toast('Ingresá un porcentaje entre 1 y 99', true); return; }
+  const comms = loadComms();
+  comms[editingBarberId] = val / 100;
+  saveComms(comms);
+  closeModal('commModal');
+  toast(`✓ Comisión de ${barberById(editingBarberId).name} actualizada a ${val}%`);
+  renderCommissions();
+}
 
 // ══════════════════════════════════════════════════
 //  TOAST
@@ -1094,14 +1143,15 @@ function renderCommissions(){
   let totalToBarbers=0, totalToLocal=0;
 
   document.getElementById('commissionCards').innerHTML = CONFIG.barbers.map(b=>{
-    const bc    = onlyCuts.filter(c=>c.barberId===b.id);
-    const bt    = bc.reduce((s,c)=>s+Number(c.price),0);
-    const btips = onlyTips.filter(c=>c.barberId===b.id).reduce((s,c)=>s+Number(c.amount||c.price),0);
-    const toBarber = bt * b.commission;
-    const toLocal  = bt * (1-b.commission);
+    const comm   = getCommission(b.id);
+    const bc     = onlyCuts.filter(c=>c.barberId===b.id);
+    const bt     = bc.reduce((s,c)=>s+Number(c.price),0);
+    const btips  = onlyTips.filter(c=>c.barberId===b.id).reduce((s,c)=>s+Number(c.amount||c.price),0);
+    const toBarber = bt * comm;
+    const toLocal  = bt * (1-comm);
     totalToBarbers += toBarber;
     totalToLocal   += toLocal;
-    const barberBarW = Math.round(b.commission*100);
+    const barberBarW = Math.round(comm*100);
     const localBarW  = 100-barberBarW;
     return `<div class="commission-card">
       <div class="commission-card-top">
@@ -1110,16 +1160,19 @@ function renderCommissions(){
           <div class="commission-name">${b.name}</div>
           <div class="commission-cuts">${bc.length} cortes · ${fmt$(bt)} facturado</div>
         </div>
-        <div class="commission-rate">${pct(b.commission)}</div>
+        <div style="display:flex;align-items:center;gap:8px;margin-left:auto;">
+          <div class="commission-rate">${pct(comm)}</div>
+          <button onclick="openCommModal('${b.id}')" style="width:30px;height:30px;border-radius:4px;background:var(--black-4);border:1px solid #2a2a2a;color:var(--white-dim);font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Editar comisión">✏️</button>
+        </div>
       </div>
       <div class="commission-breakdown">
         <div class="comm-cell">
           <div class="comm-cell-label">Le corresponde</div>
-          <div class="comm-cell-val barber">${fmt$(toBarber)}</div>
+          <div class="comm-cell-val barber">${fmt$(Math.round(toBarber))}</div>
         </div>
         <div class="comm-cell">
           <div class="comm-cell-label">Al local</div>
-          <div class="comm-cell-val local">${fmt$(toLocal)}</div>
+          <div class="comm-cell-val local">${fmt$(Math.round(toLocal))}</div>
         </div>
         <div class="comm-cell">
           <div class="comm-cell-label">Propinas</div>
@@ -1127,7 +1180,7 @@ function renderCommissions(){
         </div>
         <div class="comm-cell">
           <div class="comm-cell-label">Total barbero</div>
-          <div class="comm-cell-val total">${fmt$(toBarber+btips)}</div>
+          <div class="comm-cell-val total">${fmt$(Math.round(toBarber)+btips)}</div>
         </div>
       </div>
       <div class="comm-bar" style="margin-top:10px">
@@ -1136,6 +1189,32 @@ function renderCommissions(){
       </div>
     </div>`;
   }).join('');
+}
+
+// ══════════════════════════════════════════════════
+//  HELPERS ESTADÍSTICOS
+// ══════════════════════════════════════════════════
+function median(arr) {
+  if (!arr.length) return 0;
+  const s = [...arr].sort((a,b)=>a-b);
+  const m = Math.floor(s.length/2);
+  return s.length%2 ? s[m] : (s[m-1]+s[m])/2;
+}
+
+function monthlyRevenue(cuts, monthsBack) {
+  // Returns array of {label, revenue, count} for last N months
+  const result = [];
+  for (let i = monthsBack-1; i >= 0; i--) {
+    const d = new Date(); d.setDate(1); d.setMonth(d.getMonth()-i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    const mc  = cuts.filter(c=>c.ts.startsWith(key));
+    result.push({
+      label: d.toLocaleDateString('es-AR',{month:'short',year:'2-digit'}),
+      revenue: mc.reduce((s,c)=>s+Number(c.price),0),
+      count: mc.length
+    });
+  }
+  return result;
 }
 
 // ══════════════════════════════════════════════════
@@ -1164,19 +1243,28 @@ function renderRanking(){
       <div class="ranking-val">${fmt$(r.total)}</div>
     </div>`).join('');
 
-  // Avg ticket
+  // Ticket promedio + mediana
   const byAvg=CONFIG.barbers.map(b=>{
     const bc=cuts.filter(c=>c.barberId===b.id);
-    const avg=bc.length?bc.reduce((s,c)=>s+Number(c.price),0)/bc.length:0;
-    return {b,avg,cuts:bc.length};
-  }).sort((a,z)=>z.avg-a.avg);
+    const prices=bc.map(c=>Number(c.price));
+    const avg=prices.length?prices.reduce((s,v)=>s+v,0)/prices.length:0;
+    const med=median(prices);
+    return {b,avg,med,cuts:bc.length};
+  }).sort((a,z)=>z.med-a.med);
 
-  document.getElementById('rankAvgTicket').innerHTML=byAvg.map((r,i)=>`
+  document.getElementById('rankAvgTicket').innerHTML=`
+    <div style="font-size:10px;color:var(--white-dim);letter-spacing:1px;padding:0 0 8px;border-bottom:1px solid #1a1a1a;margin-bottom:4px;">
+      Ordenado por <b style="color:var(--gold)">mediana</b> · Se muestra promedio entre paréntesis
+    </div>
+    ${byAvg.map((r,i)=>`
     <div class="ranking-row">
       <div class="ranking-pos${i===0?' first':''}">${medals[i]||i+1}</div>
       <div><div class="ranking-name">${r.b.name}</div><div class="ranking-sub">${r.cuts} cortes registrados</div></div>
-      <div class="ranking-val">${fmt$(Math.round(r.avg))}</div>
-    </div>`).join('');
+      <div style="text-align:right">
+        <div class="ranking-val">${fmt$(Math.round(r.med))}</div>
+        <div class="ranking-sub">(avg ${fmt$(Math.round(r.avg))})</div>
+      </div>
+    </div>`).join('')}`;
 
   // Upsell
   const byUp=CONFIG.barbers.map(b=>{
@@ -1214,20 +1302,55 @@ document.getElementById('pnlPeriodSelect').addEventListener('change',renderPnL);
 
 function renderPnL(){
   const days=document.getElementById('pnlPeriodSelect').value;
+  const allCuts=loadCuts().filter(c=>c.type==='cut');
   const cuts=filteredCuts(days).filter(c=>c.type==='cut');
   const exps=filteredExp(days);
 
-  const grossRev   = cuts.reduce((s,c)=>s+Number(c.price),0);
-  const totalExp   = exps.reduce((s,e)=>s+Number(e.amount),0);
+  const grossRev  = cuts.reduce((s,c)=>s+Number(c.price),0);
+  const totalExp  = exps.reduce((s,e)=>s+Number(e.amount),0);
 
-  // Local's share = gross minus commissions
   let totalComm=0;
   CONFIG.barbers.forEach(b=>{
     const bt=cuts.filter(c=>c.barberId===b.id).reduce((s,c)=>s+Number(c.price),0);
-    totalComm+=bt*b.commission;
+    totalComm+=bt*getCommission(b.id);
   });
   const localShare = grossRev - totalComm;
   const netProfit  = localShare - totalExp;
+
+  // ── Tendencia mes a mes (últimos 2 meses completos)
+  const monthly = monthlyRevenue(allCuts, 3); // últimos 3 meses
+  let trendHTML = '';
+  if (monthly.length >= 2) {
+    const prev = monthly[monthly.length-2];
+    const curr = monthly[monthly.length-1];
+    if (prev.revenue > 0) {
+      const diff = curr.revenue - prev.revenue;
+      const pct  = Math.round((diff / prev.revenue) * 100);
+      const arrow = diff >= 0 ? '▲' : '▼';
+      const col   = diff >= 0 ? 'var(--green)' : 'var(--red)';
+      const label = curr.label;
+      trendHTML = `<div class="pnl-row">
+        <span class="pnl-label">Tendencia (${prev.label} → ${label})</span>
+        <span class="pnl-val" style="color:${col}">${arrow} ${Math.abs(pct)}%</span>
+      </div>`;
+    }
+  }
+
+  // ── Costo por corte estimado
+  let costHTML = '';
+  if (cuts.length > 0 && totalExp > 0) {
+    const costPerCut = Math.round(totalExp / cuts.length);
+    costHTML = `
+      <div class="pnl-row" style="border-top:1px solid #1e2a1e;margin-top:4px;padding-top:10px;">
+        <span class="pnl-label" style="color:var(--white-dim);">
+          Costo estimado por corte <span style="font-size:10px;opacity:.7">(gastos ÷ cortes)</span>
+        </span>
+        <span class="pnl-val" style="color:var(--white-dim)">${fmt$(costPerCut)}</span>
+      </div>
+      <div style="font-size:10px;color:var(--white-dim);padding:4px 0 2px;line-height:1.5;opacity:.8;">
+        ⚠ Estimado. No incluye amortización de insumos ni equipos. Los períodos sin gastos cargados mostrarán $0.
+      </div>`;
+  }
 
   document.getElementById('pnlCard').innerHTML=`
     <div class="pnl-title">Estado de Resultados</div>
@@ -1235,7 +1358,9 @@ function renderPnL(){
     <div class="pnl-row"><span class="pnl-label">Comisiones barberos</span><span class="pnl-val neg">– ${fmt$(Math.round(totalComm))}</span></div>
     <div class="pnl-row"><span class="pnl-label">Ingresos del local</span><span class="pnl-val pos">${fmt$(Math.round(localShare))}</span></div>
     <div class="pnl-row"><span class="pnl-label">Gastos registrados</span><span class="pnl-val neg">– ${fmt$(totalExp)}</span></div>
-    <div class="pnl-row total-row"><span class="pnl-label">RESULTADO NETO</span><span class="pnl-val total">${fmt$(Math.round(netProfit))}</span></div>`;
+    <div class="pnl-row total-row"><span class="pnl-label">RESULTADO NETO</span><span class="pnl-val total">${fmt$(Math.round(netProfit))}</span></div>
+    ${trendHTML}
+    ${costHTML}`;
 
   document.getElementById('pnlExpenseCount').textContent=exps.length;
   document.getElementById('pnlExpenseList').innerHTML=exps.length?exps.map(expItemHTML).join(''):'<div class="log-empty">SIN GASTOS EN ESTE PERÍODO</div>';
