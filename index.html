@@ -1031,7 +1031,7 @@ function saveCommission() {
   saveComms(comms);
   closeModal('commModal');
   toast(`✓ Comisión de ${barberById(editingBarberId).name} actualizada a ${val}%`);
-  renderCommissions();
+  refreshOwner();
 }
 
 // ══════════════════════════════════════════════════
