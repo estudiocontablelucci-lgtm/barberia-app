@@ -1029,8 +1029,9 @@ function saveCommission() {
   const comms = loadComms();
   comms[editingBarberId] = val / 100;
   saveComms(comms);
+  const barberName = barberById(editingBarberId).name; // guardar ANTES de closeModal
   closeModal('commModal');
-  toast(`✓ Comisión de ${barberById(editingBarberId).name} actualizada a ${val}%`);
+  toast(`✓ Comisión de ${barberName} actualizada a ${val}%`);
   refreshOwner();
 }
 
