@@ -901,9 +901,27 @@ function tipSelPay(m){
 }
 function saveTip(){
   const amount=parseFloat(document.getElementById('tipAmount').value);
-  if (!selBarber||isNaN(amount)||amount<=0||!tipPay){toast('Completá todos los campos',true);return;}
-  const now=new Date();
+  if (isNaN(amount)||amount<=0||!tipPay){toast('Completá todos los campos',true);return;}
+
   const cuts=loadCuts();
+
+  // EDICIÓN — actualizar propina existente
+  if (editingId) {
+    const idx=cuts.findIndex(c=>c.id===editingId);
+    if (idx===-1){toast('Registro no encontrado',true);return;}
+    cuts[idx].amount  = amount;
+    cuts[idx].payment = tipPay;
+    saveCuts(cuts);
+    editingId=null;
+    closeModal('tipModal');
+    toast(`💰 Propina actualizada a ${fmt$(amount)}`);
+    renderBarberGrid(); renderQuickLog(); renderFullLog();
+    return;
+  }
+
+  // NUEVO REGISTRO — requiere barbero seleccionado
+  if (!selBarber){toast('Seleccioná un barbero primero',true);return;}
+  const now=new Date();
   cuts.unshift({id:Date.now().toString(36),type:'tip',barberId:selBarber,amount,payment:tipPay,ts:now.toISOString(),date:now.toLocaleDateString('es-AR')});
   saveCuts(cuts);
   closeModal('tipModal');
@@ -967,14 +985,12 @@ function openEditModal(id) {
   editingId=id;
 
   if (cut.type==='tip') {
-    // For tips, just allow amount + payment edit via a simpler approach
     const b=barberById(cut.barberId);
     document.getElementById('tipBarberLabel').textContent=`Barbero: ${b?b.name:cut.barberId} · Editando propina`;
     document.getElementById('tipAmount').value=cut.amount||cut.price;
     tipPay=cut.payment||'cash';
     document.getElementById('tipPayCash').className='pay-btn'+(tipPay==='cash'?' sel-cash':'');
     document.getElementById('tipPayTransfer').className='pay-btn'+(tipPay==='transfer'?' sel-transfer':'');
-    // Override saveTip to update instead of insert
     openModal('tipModal');
     return;
   }
