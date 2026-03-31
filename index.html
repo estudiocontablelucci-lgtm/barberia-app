@@ -2773,7 +2773,8 @@ function switchDemoView(view) {
     document.getElementById('main-nav').innerHTML =
       '<button id="tab-session" onclick="switchTab(\'session\')">Sesión</button>' +
       '<button id="tab-stats" onclick="switchTab(\'stats\')">Stats</button>' +
-      '<button id="tab-health" onclick="switchTab(\'health\')">Salud</button>';
+      '<button id="tab-health" onclick="switchTab(\'health\')">Salud</button>' +
+      '<button id="tab-progress" onclick="switchTab(\'progress\')">&#127942; Progreso</button>';
     switchTab('health');
   }
 }
@@ -3058,7 +3059,10 @@ function renderProgress() {
 
   if (lastLog && sess) {
     html += '<div class="card" style="margin-bottom:14px">';
-    html += '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Semáforo — '+lastLog.sessionName.split("-")[0].trim()+' &middot; '+fmtDate(lastLog.date)+'</div>';
+    var semNote = (ROLE === 'athlete')
+      ? ' <span style="font-weight:400;color:var(--muted);font-size:9px;letter-spacing:0;text-transform:none">— tu entrenador ve esto para ajustar tu plan</span>'
+      : '';
+    html += '<div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-muted);margin-bottom:12px">Semáforo — '+lastLog.sessionName.split("-")[0].trim()+' &middot; '+fmtDate(lastLog.date)+semNote+'</div>';
 
     var semRows = [];
     lastLog.exercises.forEach(function(exLog) {
@@ -3114,7 +3118,8 @@ function renderProgress() {
     var newPRs = prKeys.filter(function(k){ return prs[k].date === lastLog.date; });
     if (newPRs.length) {
       html += '<div style="background:rgba(197,242,48,.1);border:1px solid rgba(197,242,48,.3);border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:13px;color:var(--accent);font-weight:600">';
-      html += '🎉 ¡Batiste '+newPRs.length+' PR'+(newPRs.length>1?'s':'')+' en la última sesión! '+newPRs.map(function(k){ return prs[k].name+': '+prs[k].rm+'kg'; }).join(' · ');
+      var prShareMsg = (ROLE === 'athlete') ? ' — ¡avisale a tu entrenador! 💬' : '';
+      html += '🎉 ¡Batiste '+newPRs.length+' PR'+(newPRs.length>1?'s':'')+' en la última sesión! '+newPRs.map(function(k){ return prs[k].name+': '+prs[k].rm+'kg'; }).join(' · ')+prShareMsg;
       html += '</div>';
     }
 
